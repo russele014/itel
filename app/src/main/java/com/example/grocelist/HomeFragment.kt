@@ -5,10 +5,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.SearchView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
@@ -21,18 +21,18 @@ class HomeFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: GroceryAdapter
     private lateinit var searchView: SearchView
-    private lateinit var categoryAll: TextView
-    private lateinit var categoryVegetables: TextView
-    private lateinit var categoryFruits: TextView
-    private lateinit var categoryMeat: TextView
-    private lateinit var categoryBeverages: TextView
+    private lateinit var categoriesContainer: LinearLayout
     private lateinit var fabAddItem: FloatingActionButton
     private lateinit var menuIcon: ImageView
     private lateinit var drawerLayout: DrawerLayout
 
+    private val categoryManager: CategoryManager by lazy {
+        CategoryManager(requireContext())
+    }
+
     // Sample data - replace with actual images from your drawable resources
     private val allItems = listOf(
-        GroceryItem(1, "Orange", R.drawable.orange, "Vegetables"),
+        GroceryItem(1, "Zuchini Slice", R.drawable.zucchini, "Vegetables"),
         GroceryItem(2, "Turnip", R.drawable.turnip, "Vegetables"),
         GroceryItem(3, "Banana", R.drawable.banana, "Fruits"),
         GroceryItem(4, "Pear", R.drawable.pear, "Fruits"),
@@ -65,11 +65,7 @@ class HomeFragment : Fragment() {
         // Initialize views
         recyclerView = view.findViewById(R.id.groceryRecyclerView)
         searchView = view.findViewById(R.id.searchView)
-        categoryAll = view.findViewById(R.id.categoryAll)
-        categoryVegetables = view.findViewById(R.id.categoryVegetables)
-        categoryFruits = view.findViewById(R.id.categoryFruits)
-        categoryMeat = view.findViewById(R.id.categoryMeat)
-        categoryBeverages = view.findViewById(R.id.categoryBeverages)
+        categoriesContainer = view.findViewById(R.id.categoriesContainer)
         fabAddItem = view.findViewById(R.id.fabAddItem)
         menuIcon = view.findViewById(R.id.menuIcon)
 
@@ -108,44 +104,75 @@ class HomeFragment : Fragment() {
             Toast.makeText(context, "Add new item", Toast.LENGTH_SHORT).show()
             // You could navigate to a new fragment or show a dialog here
         }
+
+        // Setup long press on category manager icon to navigate to category management
+        view.findViewById<ImageView>(R.id.menuIcon).setOnLongClickListener {
+            navigateToCategoryManagement()
+            true
+        }
+
+        view.findViewById<ImageView>(R.id.categoryManagerIcon).setOnClickListener {
+            navigateToCategoryManagement()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh categories when returning to this fragment
+        setupCategoryFilters()
     }
 
     private fun setupCategoryFilters() {
-        val categories = listOf(categoryAll, categoryVegetables, categoryFruits, categoryMeat, categoryBeverages)
+        // Clear existing category views
+        categoriesContainer.removeAllViews()
 
-        fun updateCategorySelection(selectedCategory: TextView) {
-            categories.forEach { it.setBackgroundResource(android.R.color.transparent) }
-            selectedCategory.setBackgroundResource(R.drawable.selected_category_background)
-        }
+        // Get categories from manager
+        val categories = categoryManager.getCategories()
 
-        categoryAll.setOnClickListener {
-            updateCategorySelection(categoryAll)
-            currentItems = allItems
-            adapter.updateList(currentItems)
-        }
+        // Track the currently selected category TextView
+        var selectedCategoryView: TextView? = null
 
-        categoryVegetables.setOnClickListener {
-            updateCategorySelection(categoryVegetables)
-            currentItems = allItems.filter { it.category == "Vegetables" }
-            adapter.updateList(currentItems)
-        }
+        // Inflate and add category TextViews
+        categories.forEach { category ->
+            val categoryView = LayoutInflater.from(context).inflate(
+                R.layout.category_item, categoriesContainer, false
+            ) as TextView
 
-        categoryFruits.setOnClickListener {
-            updateCategorySelection(categoryFruits)
-            currentItems = allItems.filter { it.category == "Fruits" }
-            adapter.updateList(currentItems)
-        }
+            // Set properties
+            categoryView.text = category.name
+            categoryView.id = View.generateViewId()
 
-        categoryMeat.setOnClickListener {
-            updateCategorySelection(categoryMeat)
-            currentItems = allItems.filter { it.category == "Meat" }
-            adapter.updateList(currentItems)
-        }
+            // Set as initially selected if it's the "All" category
+            if (category.name == "All") {
+                categoryView.setBackgroundResource(R.drawable.selected_category_background)
+                selectedCategoryView = categoryView
+            }
 
-        categoryBeverages.setOnClickListener {
-            updateCategorySelection(categoryBeverages)
-            currentItems = allItems.filter { it.category == "Beverages" }
-            adapter.updateList(currentItems)
+            // Set click listener
+            categoryView.setOnClickListener {
+                // Update selection UI
+                selectedCategoryView?.setBackgroundResource(android.R.color.transparent)
+                categoryView.setBackgroundResource(R.drawable.selected_category_background)
+                selectedCategoryView = categoryView
+
+                // Filter items by category
+                if (category.name == "All") {
+                    currentItems = allItems
+                } else {
+                    currentItems = allItems.filter { it.category == category.name }
+                }
+                adapter.updateList(currentItems)
+            }
+
+            // Add to container
+            val layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            layoutParams.marginEnd = resources.getDimensionPixelSize(R.dimen.category_margin)
+            categoryView.layoutParams = layoutParams
+
+            categoriesContainer.addView(categoryView)
         }
     }
 
@@ -159,5 +186,12 @@ class HomeFragment : Fragment() {
             it.name.contains(query, ignoreCase = true)
         }
         adapter.updateList(filteredList)
+    }
+
+    private fun navigateToCategoryManagement() {
+        val transaction = requireActivity().supportFragmentManager.beginTransaction()
+        transaction.replace(R.id.fragment_container, CategoryFragment())
+        transaction.addToBackStack(null)
+        transaction.commit()
     }
 }
