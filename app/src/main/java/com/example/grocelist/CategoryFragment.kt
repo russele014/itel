@@ -8,6 +8,8 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -16,11 +18,12 @@ import java.io.Serializable
 
 class CategoryFragment : Fragment() {
 
-    private lateinit var backButton: ImageView
+    private lateinit var menuIcon: ImageView
     private lateinit var categoryNameEditText: TextInputEditText
     private lateinit var addCategoryButton: Button
     private lateinit var categoriesRecyclerView: RecyclerView
     private lateinit var categoryAdapter: CategoryAdapter
+    private lateinit var drawerLayout: DrawerLayout
 
     // Use shared preferences to store categories
     private val categoryManager: CategoryManager by lazy {
@@ -38,14 +41,17 @@ class CategoryFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         // Initialize views
-        backButton = view.findViewById(R.id.backButton)
+        menuIcon = view.findViewById(R.id.menuIcon)
         categoryNameEditText = view.findViewById(R.id.categoryNameEditText)
         addCategoryButton = view.findViewById(R.id.addCategoryButton)
         categoriesRecyclerView = view.findViewById(R.id.categoriesRecyclerView)
 
-        // Setup back button
-        backButton.setOnClickListener {
-            requireActivity().supportFragmentManager.popBackStack()
+        // Get drawer layout from activity
+        drawerLayout = requireActivity().findViewById(R.id.drawer_layout)
+
+        // Setup drawer toggle with hamburger icon
+        menuIcon.setOnClickListener {
+            drawerLayout.openDrawer(GravityCompat.START)
         }
 
         // Setup RecyclerView
