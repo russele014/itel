@@ -15,8 +15,18 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.android.volley.Request
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
 
 class HomeFragment : Fragment() {
+
+    companion object {
+        private const val PHP_API_URL = "http://grocelist123.x10.mx/"
+    }
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: GroceryAdapter
@@ -30,27 +40,16 @@ class HomeFragment : Fragment() {
         CategoryManager(requireContext())
     }
 
-    // Sample data - replace with actual images from your drawable resources
-    private val allItems = listOf(
-        GroceryItem(1, "Zuchini Slice", R.drawable.zucchini, "Vegetables"),
-        GroceryItem(2, "Turnip", R.drawable.turnip, "Vegetables"),
-        GroceryItem(3, "Banana", R.drawable.banana, "Fruits"),
-        GroceryItem(4, "Pear", R.drawable.pear, "Fruits"),
-        GroceryItem(5, "Sweet Potato", R.drawable.potato, "Vegetables"),
-        GroceryItem(6, "Onion", R.drawable.onion, "Vegetables"),
-        GroceryItem(7, "Chicken Breast", R.drawable.chicken, "Meat"),
-        GroceryItem(8, "Beef", R.drawable.baka, "Meat"),
-        GroceryItem(9, "C2", R.drawable.ctwo, "Beverages"),
-    )
-
     data class GroceryItem(
         val id: Int,
         val name: String,
-        val imageResource: Int,
+        val imageUrl: String,
+        val imageResource: Int = 0, // For backward compatibility
         val category: String
     )
 
-    private var currentItems = allItems
+    private var allItems = listOf<GroceryItem>()
+    private var currentItems = listOf<GroceryItem>()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -79,7 +78,7 @@ class HomeFragment : Fragment() {
 
         // Setup RecyclerView
         recyclerView.layoutManager = GridLayoutManager(context, 2)
-        adapter = GroceryAdapter(currentItems) { item ->
+        adapter = GroceryAdapter(emptyList()) { item ->
             Toast.makeText(context, "${item.name}", Toast.LENGTH_SHORT).show()
         }
         recyclerView.adapter = adapter
@@ -101,25 +100,71 @@ class HomeFragment : Fragment() {
 
         // Setup add button
         fabAddItem.setOnClickListener {
-            Toast.makeText(context, "Add new item", Toast.LENGTH_SHORT).show()
-            // You could navigate to a new fragment or show a dialog here
+            navigateToAddItem()
         }
 
-        // Setup long press on category manager icon to navigate to category management
-        view.findViewById<ImageView>(R.id.menuIcon).setOnLongClickListener {
-            navigateToCategoryManagement()
-            true
-        }
-
+        // Setup category manager icon
         view.findViewById<ImageView>(R.id.categoryManagerIcon).setOnClickListener {
             navigateToCategoryManagement()
         }
+
+        // Load items from server
+        fetchItemsFromServer()
     }
 
     override fun onResume() {
         super.onResume()
-        // Refresh categories when returning to this fragment
+        // Refresh categories and items when returning to this fragment
         setupCategoryFilters()
+        fetchItemsFromServer()
+    }
+
+    private fun fetchItemsFromServer() {
+        val url = "${PHP_API_URL}get_items.php"
+        val requestQueue = Volley.newRequestQueue(requireContext())
+
+        val jsonObjectRequest = JsonObjectRequest(
+            Request.Method.GET, url, null,
+            { response ->
+                try {
+                    val success = response.getBoolean("success")
+                    if (success) {
+                        val itemsArray = response.getJSONArray("items")
+                        parseItems(itemsArray)
+                    } else {
+                        Toast.makeText(context, "Failed to load items", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: JSONException) {
+                    e.printStackTrace()
+                    Toast.makeText(context, "Error parsing response", Toast.LENGTH_SHORT).show()
+                }
+            },
+            { error ->
+                Toast.makeText(context, "Error: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+        )
+
+        requestQueue.add(jsonObjectRequest)
+    }
+
+    private fun parseItems(itemsArray: JSONArray) {
+        val items = mutableListOf<GroceryItem>()
+
+        for (i in 0 until itemsArray.length()) {
+            val item = itemsArray.getJSONObject(i)
+            items.add(
+                GroceryItem(
+                    id = item.getInt("id"),
+                    name = item.getString("name"),
+                    imageUrl = "${PHP_API_URL}uploads/${item.getString("image")}",
+                    category = item.getString("category")
+                )
+            )
+        }
+
+        allItems = items
+        currentItems = items
+        adapter.updateList(currentItems)
     }
 
     private fun setupCategoryFilters() {
@@ -191,6 +236,13 @@ class HomeFragment : Fragment() {
     private fun navigateToCategoryManagement() {
         val transaction = requireActivity().supportFragmentManager.beginTransaction()
         transaction.replace(R.id.fragment_container, CategoryFragment())
+        transaction.addToBackStack(null)
+        transaction.commit()
+    }
+
+    private fun navigateToAddItem() {
+        val transaction = requireActivity().supportFragmentManager.beginTransaction()
+        transaction.replace(R.id.fragment_container, ItemFragment())
         transaction.addToBackStack(null)
         transaction.commit()
     }

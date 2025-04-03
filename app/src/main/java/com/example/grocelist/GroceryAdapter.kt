@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.grocelist.HomeFragment.GroceryItem
 
 class GroceryAdapter(
@@ -26,7 +27,20 @@ class GroceryAdapter(
 
     override fun onBindViewHolder(holder: GroceryViewHolder, position: Int) {
         val item = groceryItems[position]
-        holder.itemImage.setImageResource(item.imageResource)
+
+        // Check if we're using a remote image or local resource
+        if (item.imageUrl.isNotEmpty()) {
+            // Load image from URL using Glide
+            Glide.with(holder.itemView.context)
+                .load(item.imageUrl)
+                .placeholder(R.drawable.placeholder_image)
+                .centerCrop()
+                .into(holder.itemImage)
+        } else if (item.imageResource != 0) {
+            // Use local resource
+            holder.itemImage.setImageResource(item.imageResource)
+        }
+
         holder.itemName.text = item.name
 
         holder.itemView.setOnClickListener {
